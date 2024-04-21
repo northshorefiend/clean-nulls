@@ -6,29 +6,27 @@ before and after and some commentary.
 
 ## Before
 
-``
-/**
-* @param id   id of Foo to update
-* @param name name to set
-* @return true if successfully updated/inserted
-*/
-public boolean upsertFoo(long id, String name) {
-    String token = login();
-
-    if (token != null) {
-        Foo foo = findFoo(token, id);
-        if (foo == null) {
-            foo = new Foo(id, name);
-            return insertFoo(token, foo);
+    /**
+    * @param id   id of Foo to update
+    * @param name name to set
+    * @return true if successfully updated/inserted
+    **/
+    public boolean upsertFoo(long id, String name) {
+        String token = login();
+    
+        if (token != null) {
+            Foo foo = findFoo(token, id);
+            if (foo == null) {
+                foo = new Foo(id, name);
+                return insertFoo(token, foo);
+            } else {
+                foo.setName(name);
+                return updateFoo(token, foo);
+            }
         } else {
-            foo.setName(name);
-            return updateFoo(token, foo);
+            return false;
         }
-    } else {
-        return false;
     }
-}
-``
 
 There are a couple of things that straight away I don't like. Firstly, I always find nested ``if``s to be suspect.
 Usually, there is a better way to structure your code. Secondly, ``else`` statements are also suspect, again,
@@ -43,21 +41,19 @@ obvious is a good reason to find a better way. A ``null`` value would be returne
 when login fails. This is a clue to what to do, we should assume that the login succeeds and when it doesn't throw an
 exception. (I'm going to leave the argument on whether you should use checked or unchecked exceptions for another day)
 
-``
-public boolean upsertFoo(long id, String name) throws FooException {
-    String token = login();
-
-    Foo foo = findFoo(token, id);
-
-    if (foo == null) {
-        foo = new Foo(id, name);
-        return insertFoo(token, foo);
+    public boolean upsertFoo(long id, String name) throws FooException {
+        String token = login();
+    
+        Foo foo = findFoo(token, id);
+    
+        if (foo == null) {
+            foo = new Foo(id, name);
+            return insertFoo(token, foo);
+        }
+    
+        foo.setName(name);
+        return updateFoo(token, foo);
     }
-
-    foo.setName(name);
-    return updateFoo(token, foo);
-}
-``
 
 With just this improvement we have got rid of the nested ``if`` and the ``else``, great!
 
@@ -75,22 +71,20 @@ case is a good use.
 
 Assuming, ``findFoo`` returns an ``Optional<Foo>`` then we can refactor to this:
 
-``
-public boolean upsertFoo(long id, String name) throws FooException {
-    String token = login();
-
-    Optional<Foo> optionalFoo = findFoo(token, id);
-
-    if (optionalFoo.isEmpty()) {
-        Foo newFoo = new Foo(id, name);
-        return insertFoo(token, newFoo);
+    public boolean upsertFoo(long id, String name) throws FooException {
+        String token = login();
+    
+        Optional<Foo> optionalFoo = findFoo(token, id);
+    
+        if (optionalFoo.isEmpty()) {
+            Foo newFoo = new Foo(id, name);
+            return insertFoo(token, newFoo);
+        }
+    
+        Foo existingFoo = optionalFoo.get();
+        existingFoo.setName(name);
+        return updateFoo(token, existingFoo);
     }
-
-    Foo existingFoo = optionalFoo.get();
-    existingFoo.setName(name);
-    return updateFoo(token, existingFoo);
-}
-``
 
 We seem to have added more lines of code, so why is this better? Well, now the IDE will tell us if we haven't
 checked that the ``Foo`` exists. If we try to call ``optionalFoo.get()`` before calling something that checks if
@@ -104,7 +98,7 @@ assume they succeed and throw an Exception on failure. What should these methods
 updated or inserted ``Foo``. The calling function can decide whether it needs it.
 
 # Clean
-``
+
     /**
      * @param id   id of Foo to update
      * @param name name to set
@@ -123,7 +117,6 @@ updated or inserted ``Foo``. The calling function can decide whether it needs it
         existingFoo.setName(name);
         return updateFoo(token, existingFoo);
     }
-``
 
 Hopefully, you agree that this is cleaner code, and less likely to introduce bugs in the future.
 Compilable code is on [GitHub](https://github.com/northshorefiend/clean-nulls)
